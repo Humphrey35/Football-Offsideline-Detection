@@ -62,13 +62,12 @@ while True:
 	gray = cv2.cvtColor(orig,cv2.COLOR_BGR2GRAY)
 	blur_gray = cv2.GaussianBlur(gray, (15, 15), 0)
 	
-	cv2.imshow("grey", blur_gray)
 	low_threshold = 50
 	high_threshold = 150
 	edges = cv2.Canny(blur_gray, low_threshold, high_threshold)
 	
 	rho = 1  # distance resolution in pixels of the Hough grid
-	theta = np.pi / 180  # angular resolution in radians of the Hough grid
+	theta = np.pi / 90  # angular resolution in radians of the Hough grid
 	threshold = 15  # minimum number of votes (intersections in Hough grid cell)
 	min_line_length = 200  # minimum number of pixels making up a line
 	max_line_gap = 10  # maximum gap in pixels between connectable line segments
@@ -97,8 +96,10 @@ while True:
 	
 	team1Player = np.array([])
 	team2Player = np.array([])
-	team1PlayerPosition = 0
-	team2PlayerPosition = 0
+	team1PlayerPositionX = 0
+	team2PlayerPositionX = 0
+	team1PlayerPositionY = 0
+	team2PlayerPositionY = 0
 	
 	for i in range(len(weights)):
 		if (weights[i] > 0.7):
@@ -155,14 +156,15 @@ while True:
 				if (percTeam1 > 0.03):
 					team2Player = np.append(team2Player, rects[i])
 					cv2.rectangle(image, (x, y), (x + w, y + h), (0, 0, 255), 2)
-					if (team1PlayerPosition < (x+w)):
-						team1PlayerPosition = x+w
+					if (team1PlayerPositionX < (x+w)):
+						team1PlayerPositionX = x+w
+						team1PlayerPositionY = y+h
 				else:
 					team1Player = np.append(team1Player, rects[i])
 					cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-					if (team2PlayerPosition < (x+w)):
-						team2PlayerPosition = x+w
-						
+					if (team2PlayerPositionX < (x+w)):
+						team2PlayerPositionX = x+w
+						team2PlayerPositionY = y+h
 				#key = cv2.waitKey(0)
 				#if key == ord("q"):
 				#	break
@@ -189,7 +191,30 @@ while True:
 	# show the output images
 	#image = imutils.resize(image, width=720)
 	
-	cv2.line(image,(x1,y1),(x2,y2),(255,0,0),5)
+	x1,y1,x2,y2
+	lineX = (offsideLine[3] - offsideLine[1]) / (offsideLine[2] - offsideLine[0])
+	lineB =  offsideLine[1] - lineX*offsideLine[0]
+	
+	t1y = 0
+	t1x = int(lineB)
+	t2y = int(image.shape[1])
+	t2x = int(lineX*image.shape[1] + lineB)
+	
+	xtmp = offsideLine[2]-offsideLine[0]
+	ytmp = offsideLine[3]-offsideLine[1]
+	
+	lineOffsideX = lineX
+	lineOffsideB =  team1PlayerPositionY - lineOffsideX*team1PlayerPositionX
+	
+	o1y = 0
+	o1x = int(lineOffsideB)
+	o2y = int(image.shape[1])
+	o2x = int(lineOffsideX*image.shape[1] + lineOffsideB)
+	
+	cv2.line(image, (t1y, t1x), (t2y,t2x), (255,0,0), 5)
+	
+	cv2.line(image, (o1y, o1x), (o2y,o2x), (255,0,0), 5)
+	
 	image = imutils.resize(image, width=720)
 	cv2.imshow("Before NMS", image)
 	#cv2.imshow("After NMS", image)
