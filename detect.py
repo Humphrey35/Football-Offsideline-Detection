@@ -5,10 +5,16 @@
 from __future__ import print_function
 from imutils.object_detection import non_max_suppression
 from imutils import paths
+from scipy.optimize import fsolve
 import numpy as np
 import argparse
 import imutils
 import cv2
+
+def f(xy, funcargs):
+   x, y = xy
+   z = np.array([y - funcargs[0][0]*x - funcargs[0][1], y - funcargs[0][2]*x - funcargs[0][3]])
+   return z
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
@@ -40,6 +46,7 @@ hog = cv2.HOGDescriptor(winSize,blockSize,blockStride,cellSize,nbins)
 hog.setSVMDetector(cv2.HOGDescriptor_getDaimlerPeopleDetector())
 
 offsideLine = np.array([])
+testLine = np.array([])
 
 # loop over the video
 while True:
@@ -76,8 +83,7 @@ while True:
 	lines = cv2.HoughLinesP(edges, rho, theta, threshold, np.array([]), min_line_length, max_line_gap)
 	longestLine = 0
 	
-	print(len(lines))
-	if (len(lines) > 0):
+	if (lines is not None):
 		for line in lines:
 			for x1,y1,x2,y2 in line:
 				# we only need one line. but it has be a vertical line.
@@ -85,23 +91,40 @@ while True:
 					if (longestLine < np.sqrt((x2-x1)**2 + (y2-y1)**2)):
 						longestLine = np.sqrt((x2-x1)**2 + (y2-y1)**2)
 						offsideLine = (x1,y1,x2,y2)
+				if (edges.shape[1] - x2 < 20):
+					testLine = (x1,y1,x2,y2)
 
 	# detect people in the image
 	(rects, weights) = hog.detectMultiScale(image, winStride=(4, 4))
 
+	# calculate line parameters of the Offside / Origin Line from the two dots given from the HoughLinesP
+	lineX = (offsideLine[3] - offsideLine[1]) / (offsideLine[2] - offsideLine[0])
+	lineB =  offsideLine[1] - lineX*offsideLine[0]
+	t1y = 0
+	t1x = int(lineB)
+	t2y = int(image.shape[1])
+	t2x = int(lineX*image.shape[1] + lineB)
+	
+	# calculate intersect 16m box 5m bos
+	testX = (testLine[3] - testLine[1]) / (testLine[2] - testLine[0])
+	testB =  testLine[1] - testX*testLine[0]
+	z = (lineX, lineB, testX, testB)
+	
+	intersect = fsolve(f, [1, 2], args=[z])
+	
 	# init arrays to store the players after it was made sure that it is indeed a player
 	team1Player = np.array([])
 	team2Player = np.array([])
 	# store the position of the last man of each team on the pitch
 	team1PlayerPositionX = 0
-	team2PlayerPositionX = 0
+	team2PlayerPositionX = 100000000
 	team1PlayerPositionY = 0
 	team2PlayerPositionY = 0
 	
 	# iterate over the found players
 	for i in range(len(weights)):
 		(x, y, w, h) = rects[i]
-		cv2.rectangle(image, (x, y), (x + w, y + h), (255, 255, 255), 2)
+		#cv2.rectangle(image, (x, y), (x + w, y + h), (255, 255, 255), 2)
 		# throw all results under a threshold away
 		if (weights[i] > 0.7):
 			
@@ -115,7 +138,7 @@ while True:
 			maskTeam1 = cv2.morphologyEx(maskTeam1, cv2.MORPH_CLOSE, kernel)
 			percTeam1 = (maskTeam1>254).sum() / (len(maskTeam1)*len(maskTeam1[0]))
 			
-			print("Team1/white " + str((maskTeam1>254).sum() / (len(maskTeam1)*len(maskTeam1[0]))))
+			#print("Team1/white " + str((maskTeam1>254).sum() / (len(maskTeam1)*len(maskTeam1[0]))))
 			
 			hsvGreen = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
 			maskGreen = cv2.inRange(hsvGreen, lower['green'], upper['green'])
@@ -123,7 +146,7 @@ while True:
 			maskGreen = cv2.morphologyEx(maskGreen, cv2.MORPH_CLOSE, kernel)
 			percGreen = (maskGreen>254).sum() / (len(maskGreen)*len(maskGreen[0]))
 			
-			print("Green " + str((maskGreen>254).sum() / (len(maskGreen)*len(maskGreen[0]))))
+			#print("Green " + str((maskGreen>254).sum() / (len(maskGreen)*len(maskGreen[0]))))
 			
 			hsvTeam2 = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
 			maskTeam2 = cv2.inRange(hsvTeam2, lower['team2'], upper['team2'])
@@ -131,12 +154,12 @@ while True:
 			maskTeam2 = cv2.morphologyEx(maskTeam2, cv2.MORPH_CLOSE, kernel)
 			percTeam2 = (maskTeam2>254).sum() / (len(maskTeam2)*len(maskTeam2[0]))
 			
-			print("Team2/red " + str((maskTeam2>254).sum() / (len(maskTeam2)*len(maskTeam2[0]))))
+			#print("Team2/red " + str((maskTeam2>254).sum() / (len(maskTeam2)*len(maskTeam2[0]))))
 			
-			print(" ")
+			#print(" ")
 			
 			# apply a blue rectange on all found spots
-			cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
+			#cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
 			
 			# use the green to filter out fans
 			if (percGreen < 0.7 and percGreen > 0.1):
@@ -144,37 +167,29 @@ while True:
 				if (percTeam1 > 0.03):
 					team2Player = np.append(team2Player, rects[i])
 					cv2.rectangle(image, (x, y), (x + w, y + h), (0, 0, 255), 2)
-					if (team1PlayerPositionX < (x+w)):
-						team1PlayerPositionX = x+w
-						team1PlayerPositionY = y+h
+					
+					# calculate offside line from found player
+					lineX = (intersect[1] - (y + h)) / (intersect[0] - (w + x))
+					lineB =  (y + h) - lineX*(x + w)
+					ro1y = 0
+					ro1x = int(lineB)
+					ro2y = int(image.shape[1])
+					ro2x = int(lineX*image.shape[1] + lineB)
+					
+					if (team2PlayerPositionX > ro2x and ro2x > 0):
+						team2PlayerPositionX = ro2x
+						team2PlayerPositionY = ro1x
 				else:
 					team1Player = np.append(team1Player, rects[i])
 					cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-					if (team2PlayerPositionX < (x+w)):
-						team2PlayerPositionX = x+w
-						team2PlayerPositionY = y+h
-
-	# calculate line parameters of the Offside / Origin Line from the two dots given from the HoughLinesP
-	lineX = (offsideLine[3] - offsideLine[1]) / (offsideLine[2] - offsideLine[0])
-	lineB =  offsideLine[1] - lineX*offsideLine[0]
-	t1y = 0
-	t1x = int(lineB)
-	t2y = int(image.shape[1])
-	t2x = int(lineX*image.shape[1] + lineB)
-	xtmp = offsideLine[2]-offsideLine[0]
-	ytmp = offsideLine[3]-offsideLine[1]
-	lineOffsideX = lineX
-	lineOffsideB =  team1PlayerPositionY - lineOffsideX*team1PlayerPositionX
-	o1y = 0
-	o1x = int(lineOffsideB)
-	o2y = int(image.shape[1])
-	o2x = int(lineOffsideX*image.shape[1] + lineOffsideB)
 	
 	# draw the Origin if the Offside Line
-	cv2.line(image, (t1y, t1x), (t2y,t2x), (100,240,80), 5)
+	#cv2.line(image, (t1y, t1x), (t2y,t2x), (100,240,80), 5)
+	cv2.line(image, (0, team2PlayerPositionY), (int(image.shape[1]),team2PlayerPositionX), (120,120,220), 5)
 	
-	# draw Offside Line
-	cv2.line(image, (o1y, o1x), (o2y,o2x), (30,120,220), 5)
+	# draw line on the 5 box
+	#if (len(testLine) > 0):
+	#	cv2.line(image, (testLine[0], testLine[1]), (testLine[2],testLine[3]), (30,120,120), 5)
 	
 	# show the result
 	image = imutils.resize(image, height=720)
