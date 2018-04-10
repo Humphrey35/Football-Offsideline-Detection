@@ -28,6 +28,16 @@ upper = {'team1': (255, 40, 255), 'green': (60, 255, 255), 'team2': (186, 255, 2
 lowGrayThreshold = 50
 highGrayThreshold = 150
 
+# Do colorfiltering and morphing for detected players
+def colorFiltering(image, lower_threshold, upper_threshold):
+    hsvTeam = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    maskTeam = cv2.inRange(hsvTeam, lower_threshold, upper_threshold)
+    maskTeam = cv2.morphologyEx(maskTeam, cv2.MORPH_OPEN, kernel)
+    maskTeam = cv2.morphologyEx(maskTeam, cv2.MORPH_CLOSE, kernel)
+    percTeam  = (maskTeam > 254).sum() / (len(maskTeam) * len(maskTeam[0]))
+    return percTeam
+
+
 # Initialize the HOG descriptor/person detector
 # Interesting that most variables only support one parameter right now
 winSize = (48, 96)
@@ -119,6 +129,7 @@ while True:
     # Init arrays to store the players after it was made sure that it is indeed a player
     team1Player = np.array([])
     team2Player = np.array([])
+
     # Store the position of the last man of each team on the pitch
     team1PlayerPositionX = 0
     team2PlayerPositionX = 100000000
@@ -136,7 +147,6 @@ while True:
         # DEBUG: Show all detected pedestrians
         # cv2.rectangle(image, (x, y), (x + w, y + h), (255, 255, 255), 2)
 
-
         # Throw all results under a threshold away
         if (weights[i] > 0.7):
 
@@ -145,31 +155,19 @@ while True:
 
             # Find the percentage of the definded colors
             # Team 1
-            hsvTeam1 = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-            maskTeam1 = cv2.inRange(hsvTeam1, lower['team1'], upper['team1'])
-            maskTeam1 = cv2.morphologyEx(maskTeam1, cv2.MORPH_OPEN, kernel)
-            maskTeam1 = cv2.morphologyEx(maskTeam1, cv2.MORPH_CLOSE, kernel)
-            percTeam1 = (maskTeam1>254).sum() / (len(maskTeam1)*len(maskTeam1[0]))
+            percTeam1 = colorFiltering(crop, lower['team1'], upper['team1'])
 
             # DEBUG:
             # print("Team1/white " + str((maskTeam1>254).sum() / (len(maskTeam1)*len(maskTeam1[0]))))
 
             # Grass
-            hsvGreen = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-            maskGreen = cv2.inRange(hsvGreen, lower['green'], upper['green'])
-            maskGreen = cv2.morphologyEx(maskGreen, cv2.MORPH_OPEN, kernel)
-            maskGreen = cv2.morphologyEx(maskGreen, cv2.MORPH_CLOSE, kernel)
-            percGreen = (maskGreen>254).sum() / (len(maskGreen)*len(maskGreen[0]))
+            percGreen = colorFiltering(crop, lower['green'], upper['green'])
 
             # DEBUG:
             # print("Green " + str((maskGreen>254).sum() / (len(maskGreen)*len(maskGreen[0]))))
 
             # Team2
-            hsvTeam2 = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-            maskTeam2 = cv2.inRange(hsvTeam2, lower['team2'], upper['team2'])
-            maskTeam2 = cv2.morphologyEx(maskTeam2, cv2.MORPH_OPEN, kernel)
-            maskTeam2 = cv2.morphologyEx(maskTeam2, cv2.MORPH_CLOSE, kernel)
-            percTeam2 = (maskTeam2>254).sum() / (len(maskTeam2)*len(maskTeam2[0]))
+            percTeam2 = colorFiltering(crop, lower['team2'], upper['team2'])
 
             # DEBUG:
             # print("Team2/red " + str((maskTeam2>254).sum() / (len(maskTeam2)*len(maskTeam2[0]))))
@@ -186,7 +184,7 @@ while True:
 
                     # Calculate offside line from found player
                     lineX = (intersect[1] - (y + h)) / (intersect[0] - (w + x))
-                    lineB =  (y + h) - lineX*(x + w)
+                    lineB = (y + h) - lineX*(x + w)
                     ro1y = 0
                     ro1x = int(lineB)
                     ro2y = int(image.shape[1])
