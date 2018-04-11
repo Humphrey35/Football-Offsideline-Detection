@@ -1,4 +1,4 @@
-# Football-Player-Tracking
+# Football-Offsideline-Detection
 
 using Python with Numpy and OpenCV.
 
