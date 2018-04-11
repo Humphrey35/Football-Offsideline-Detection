@@ -111,20 +111,22 @@ while True:
                         box5Line = (x1, y1, x2, y2)
 
     # Calculate line parameters of the Offside / Origin Line from the two dots given from the HoughLinesP
-    lineX = (offsideLine[3] - offsideLine[1]) / (offsideLine[2] - offsideLine[0])
-    lineB =  offsideLine[1] - lineX*offsideLine[0]
-    t1y = 0
-    t1x = int(lineB)
-    t2y = int(image.shape[1])
-    t2x = int(lineX*image.shape[1] + lineB)
+	if (offsideLine is not None and len(offsideLine) > 0):
+		lineX = (offsideLine[3] - offsideLine[1]) / (offsideLine[2] - offsideLine[0])
+		lineB =  offsideLine[1] - lineX*offsideLine[0]
+		t1y = 0
+		t1x = int(lineB)
+		t2y = int(image.shape[1])
+		t2x = int(lineX*image.shape[1] + lineB)
 
     ''' Calculate intersection of 16m box and 5m box. 
     '   Calculated point is used for turning offsideLine into right angle '''
-    testX = (box5Line[3] - box5Line[1]) / (box5Line[2] - box5Line[0])
-    testB = box5Line[1] - testX * box5Line[0]
-    z = (lineX, lineB, testX, testB)
+	if (box5Line is not None and len(box5Line) > 0):
+		testX = (box5Line[3] - box5Line[1]) / (box5Line[2] - box5Line[0])
+		testB = box5Line[1] - testX * box5Line[0]
+		z = (lineX, lineB, testX, testB)
 
-    intersect = fsolve(f, [1, 2], args=[z])
+		intersect = fsolve(f, [1, 2], args=[z])
 
     # Init arrays to store the players after it was made sure that it is indeed a player
     team1Player = np.array([])
@@ -183,16 +185,17 @@ while True:
                     cv2.rectangle(image, (x, y), (x + w, y + h), (0, 0, 255), 2)
 
                     # Calculate offside line from found player
-                    lineX = (intersect[1] - (y + h)) / (intersect[0] - (w + x))
-                    lineB = (y + h) - lineX*(x + w)
-                    ro1y = 0
-                    ro1x = int(lineB)
-                    ro2y = int(image.shape[1])
-                    ro2x = int(lineX*image.shape[1] + lineB)
+					if (box5Line is not None and len(box5Line) > 0):
+						lineX = (intersect[1] - (y + h)) / (intersect[0] - (w + x))
+						lineB = (y + h) - lineX*(x + w)
+						ro1y = 0
+						ro1x = int(lineB)
+						ro2y = int(image.shape[1])
+						ro2x = int(lineX*image.shape[1] + lineB)
 
-                    if (team2PlayerPositionX > ro2x and ro2x > 0):
-                        team2PlayerPositionX = ro2x
-                        team2PlayerPositionY = ro1x
+						if (team2PlayerPositionX > ro2x and ro2x > 0):
+							team2PlayerPositionX = ro2x
+							team2PlayerPositionY = ro1x
                 else:
                     team1Player = np.append(team1Player, rects[i])
                     cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
@@ -202,7 +205,8 @@ while True:
     # DEBUG:
     # cv2.line(image, (t1y, t1x), (t2y,t2x), (100,240,80), 5)
 
-    cv2.line(image, (0, team2PlayerPositionY), (int(image.shape[1]),team2PlayerPositionX), (120,120,220), 5)
+	if (box5Line is not None and len(box5Line) > 0):
+		cv2.line(image, (0, team2PlayerPositionY), (int(image.shape[1]),team2PlayerPositionX), (120,120,220), 5)
 
     # DEBUG:
     # draw line on the 5 box
