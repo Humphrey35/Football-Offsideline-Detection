@@ -12,7 +12,13 @@ Requirements:
 * Python-Packages: scipy, numpy, argparse, opencv
 
 Usage with **python3 detect.py -v Offside_normal.mp4** <br/>
+For better understanding, uncomment lines after DEBUG-comments in python-file
 <br/>
 <br/>
 Script hsv.py can be used to determine thresholds for team colors. <br/>
 Usage with **python3 hsv.py -i Offside_normal.mp4** 
+
+## Known issues
+* Currently only working with example video
+* Need two field lines for offside-line calculation
+* Player detection needs some improvement 

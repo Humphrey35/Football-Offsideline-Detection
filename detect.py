@@ -120,14 +120,14 @@ def main():
             t2y = int(image.shape[1])
             t2x = int(lineX*image.shape[1] + lineB)
 
-        ''' Calculate intersection of 16m box and 5m box. 
-        '   Calculated point is used for turning offsideLine into right angle '''
-        if (box5Line is not None and len(box5Line) > 0):
-            testX = (box5Line[3] - box5Line[1]) / (box5Line[2] - box5Line[0])
-            testB = box5Line[1] - testX * box5Line[0]
-            z = (lineX, lineB, testX, testB)
+            ''' Calculate intersection of 16m box and 5m box. 
+            '   Calculated point is used for turning offsideLine into right angle '''
+            if (box5Line is not None and len(box5Line) > 0):
+                testX = (box5Line[3] - box5Line[1]) / (box5Line[2] - box5Line[0])
+                testB = box5Line[1] - testX * box5Line[0]
+                z = (lineX, lineB, testX, testB)
 
-            intersect = fsolve(f, [1, 2], args=[z])
+                intersect = fsolve(f, [1, 2], args=[z])
 
         # Init arrays to store the players after it was made sure that it is indeed a player
         team1Player = np.array([])
